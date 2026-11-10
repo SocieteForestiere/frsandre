@@ -1,0 +1,20 @@
+Package: frsandre
+Title: Access and Retrieve Data from SANDRE Web Services
+Version: 0.0.0.9000
+Authors@R: 
+   person("Matthieu", "CHEVEREAU", , "matthieu.chevereau@forestiere.fr", role = c("aut", "cre"))
+Description: This package provides tools to access and retrieve geographic and 
+   descriptive data from the French National Service for Water Data and Referential Management (SANDRE). 
+   Includes functions to query SANDRE web services (WFS and WMS), discover available resources, 
+   and retrieve spatial data for use in R workflows.
+License: GPL (>= 3)
+Config/roxygen2/version: 8.1.1
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Imports:
+    cli,
+    httr2,
+    sf,
+    xml2
+Depends: 
+    R (>= 4.1.0)
