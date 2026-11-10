@@ -2,6 +2,7 @@
 
 export(get_layers)
 export(get_wfs)
+export(get_wms)
 importFrom(cli,
   cli_abort,
   cli_alert
@@ -13,12 +14,15 @@ importFrom(httr2,
   resp_body_raw,
   resp_check_status
 )
+importFrom(jsonlite,fromJSON)
 importFrom(sf,
+  gdal_utils,
   st_bbox,
   st_crs,
   st_read,
   st_transform
 )
+importFrom(terra,rast)
 importFrom(xml2,
   read_xml,
   xml_find_all,

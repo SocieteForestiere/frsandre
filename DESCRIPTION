@@ -14,7 +14,9 @@ Roxygen: list(markdown = TRUE)
 Imports:
     cli,
     httr2,
+    jsonlite,
     sf,
+    terra,
     xml2
 Depends: 
     R (>= 4.1.0)
