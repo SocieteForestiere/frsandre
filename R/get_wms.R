@@ -98,7 +98,17 @@ get_wms <- function(
   }
 
   # --- Validate CRS ---
-  target_crs <- sf::st_crs(crs)
+  target_crs <- tryCatch(
+    sf::st_crs(crs),
+    error = function(e) {
+      cli::cli_abort(
+        "Argument {.arg crs} must be a valid coordinate reference system.",
+        call = NULL
+      )
+    }
+  )
+
+  x <- sf::st_transform(x, target_crs)
 
   if (is.na(target_crs)) {
     cli::cli_abort(
