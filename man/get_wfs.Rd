@@ -20,13 +20,18 @@ success message. Defaults to \code{TRUE}.}
 }
 \value{
 An \code{sf} object containing the retrieved features, reprojected
-to the requested coordinate reference system.
+to the requested coordinate reference system. Returns \code{NULL} if no
+features are found or if the WFS request fails.
 }
 \description{
 Retrieve spatial features from the SANDRE geographic Web Feature Service
 (WFS) within the bounding box of a given spatial object.
 
-The function transforms the input bounding box to EPSG:3857, queries the
+The function transforms the input bounding box to \code{EPSG:3857}, queries the
 WFS GetFeature endpoint and returns the retrieved features as an \code{sf}
 object reprojected to the requested coordinate reference system.
+
+If the requested bounding box contains no features, the function returns
+\code{NULL} with a warning. Errors encountered while communicating with the WFS
+or invalid WFS responses also result in a warning and \code{NULL}.
 }

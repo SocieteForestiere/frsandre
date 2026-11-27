@@ -4,9 +4,13 @@
 #' Retrieve spatial features from the SANDRE geographic Web Feature Service
 #' (WFS) within the bounding box of a given spatial object.
 #'
-#' The function transforms the input bounding box to EPSG:3857, queries the
+#' The function transforms the input bounding box to `EPSG:3857`, queries the
 #' WFS GetFeature endpoint and returns the retrieved features as an `sf`
 #' object reprojected to the requested coordinate reference system.
+#'
+#' If the requested bounding box contains no features, the function returns
+#' `NULL` with a warning. Errors encountered while communicating with the WFS
+#' or invalid WFS responses also result in a warning and `NULL`.
 #'
 #' @param x An `sf` or `sfc` object defining the spatial extent of the query.
 #'
@@ -20,10 +24,12 @@
 #'   success message. Defaults to `TRUE`.
 #'
 #' @return An `sf` object containing the retrieved features, reprojected
-#'   to the requested coordinate reference system.
+#'   to the requested coordinate reference system. Returns `NULL` if no
+#'   features are found or if the WFS request fails.
 #'
-#' @importFrom cli cli_abort cli_alert
-#' @importFrom httr2 request req_url_query req_perform resp_check_status resp_body_raw
+#' @importFrom cli cli_abort cli_alert cli_alert_warning cli_warn
+#' @importFrom httr2 request req_url_query req_perform resp_check_status
+#'   resp_body_raw
 #' @importFrom sf st_bbox st_transform st_read st_crs
 #' @importFrom xml2 read_xml xml_root xml_name xml_text xml_find_all
 #'
@@ -87,18 +93,31 @@ get_wfs <- function(
   # --- WFS request ---
   url <- "https://services.sandre.eaufrance.fr/geo/sandre"
 
-  response <- httr2::request(url) |>
-    httr2::req_url_query(
-      SERVICE = "WFS",
-      VERSION = "2.0.0",
-      REQUEST = "GetFeature",
-      TYPENAMES = layer,
-      SRSNAME = "EPSG:3857",
-      BBOX = bbox
-    ) |>
-    httr2::req_perform()
+  response <- tryCatch(
+    httr2::request(url) |>
+      httr2::req_url_query(
+        SERVICE = "WFS",
+        VERSION = "2.0.0",
+        REQUEST = "GetFeature",
+        TYPENAMES = layer,
+        SRSNAME = "EPSG:3857",
+        BBOX = bbox
+      ) |>
+      httr2::req_perform() |>
+      httr2::resp_check_status(),
+    error = function(e) {
+      cli::cli_warn(
+        "WFS request failed: {.val {conditionMessage(e)}}.",
+        call = NULL
+      )
 
-  httr2::resp_check_status(response)
+      NULL
+    }
+  )
+
+  if (is.null(response)) {
+    return(NULL)
+  }
 
   # --- Validate WFS response ---
   doc <- xml2::read_xml(
@@ -116,17 +135,21 @@ get_wfs <- function(
       )
     )
 
-    cli::cli_abort(
-      "WFS request failed: {.val {paste(message, collapse = '; ')}}",
+    cli::cli_warn(
+      "WFS request failed: {.val {paste(message, collapse = '; ')}}.",
       call = NULL
     )
+
+    return(NULL)
   }
 
   if (root_name != "FeatureCollection") {
-    cli::cli_abort(
+    cli::cli_warn(
       "Unexpected WFS response: {.val {root_name}}.",
       call = NULL
     )
+
+    return(NULL)
   }
 
   # --- Read GML response ---
@@ -145,24 +168,29 @@ get_wfs <- function(
 
   # --- Validate features ---
   if (!inherits(res, "sf")) {
-    cli::cli_abort(
+    cli::cli_warn(
       "Unable to read WFS features.",
       call = NULL
     )
+
+    return(NULL)
   }
 
   if (nrow(res) == 0L) {
-    cli::cli_abort(
-      "WFS returned no features for the requested bounding box",
-      call = NULL
+    cli::cli_alert_warning(
+      "No features found for the requested bounding box."
     )
+
+    return(NULL)
   }
 
   if (is.na(sf::st_crs(res))) {
-    cli::cli_abort(
-      "WFS features have no defined coordinate reference system",
+    cli::cli_warn(
+      "WFS features have no defined coordinate reference system.",
       call = NULL
     )
+
+    return(NULL)
   }
 
   # --- Reproject geometries ---

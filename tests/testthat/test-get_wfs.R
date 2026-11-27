@@ -259,6 +259,82 @@ testthat::test_that("get_wfs() retrieves and transforms mocked features", {
   testthat::expect_equal(sf::st_crs(res)$epsg, 2154)
 })
 
+
+testthat::test_that("get_wfs() handles request errors", {
+
+  x <- sf::st_as_sf(
+    sf::st_sfc(
+      sf::st_point(c(0, 0)),
+      crs = 4326
+    )
+  )
+
+  testthat::local_mocked_bindings(
+    request = function(url) {
+      list(url = url)
+    },
+    req_url_query = function(req, ...) {
+      req
+    },
+    req_perform = function(req) {
+      stop("Connection failed")
+    },
+    .package = "httr2"
+  )
+
+  testthat::expect_warning(
+    res <- get_wfs(
+      x = x,
+      layer = "BassinDCE",
+      verbose = FALSE
+    ),
+    regexp = "Connection failed"
+  )
+
+  testthat::expect_null(res)
+})
+
+
+testthat::test_that("get_wfs() handles HTTP errors", {
+
+  x <- sf::st_as_sf(
+    sf::st_sfc(
+      sf::st_point(c(0, 0)),
+      crs = 4326
+    )
+  )
+
+  response <- list()
+
+  testthat::local_mocked_bindings(
+    request = function(url) {
+      list(url = url)
+    },
+    req_url_query = function(req, ...) {
+      req
+    },
+    req_perform = function(req) {
+      response
+    },
+    resp_check_status = function(response) {
+      stop("HTTP 500 Internal Server Error")
+    },
+    .package = "httr2"
+  )
+
+  testthat::expect_warning(
+    res <- get_wfs(
+      x = x,
+      layer = "BassinDCE",
+      verbose = FALSE
+    ),
+    regexp = "HTTP 500"
+  )
+
+  testthat::expect_null(res)
+})
+
+
 testthat::test_that("get_wfs() reports WFS ExceptionReport", {
 
   x <- sf::st_as_sf(
@@ -301,25 +377,20 @@ testthat::test_that("get_wfs() reports WFS ExceptionReport", {
     .package = "httr2"
   )
 
-  testthat::expect_error(
-    get_wfs(
-      x = x,
-      layer = "UnknownLayer",
-      verbose = FALSE
-    )
-  )
-
-  testthat::expect_error(
-    get_wfs(
+  testthat::expect_warning(
+    res <- get_wfs(
       x = x,
       layer = "UnknownLayer",
       verbose = FALSE
     ),
     regexp = "Unknown layer"
   )
+
+  testthat::expect_null(res)
 })
 
-testthat::test_that("get_wfs() rejects unexpected WFS response", {
+
+testthat::test_that("get_wfs() handles unexpected WFS responses", {
 
   x <- sf::st_as_sf(
     sf::st_sfc(
@@ -358,12 +429,76 @@ testthat::test_that("get_wfs() rejects unexpected WFS response", {
     .package = "httr2"
   )
 
-  testthat::expect_error(
-    get_wfs(
+  testthat::expect_warning(
+    res <- get_wfs(
       x = x,
       layer = "BassinDCE",
       verbose = FALSE
     ),
     regexp = "Unexpected WFS response"
   )
+
+  testthat::expect_null(res)
+})
+
+
+testthat::test_that("get_wfs() handles empty WFS responses", {
+
+  x <- sf::st_as_sf(
+    sf::st_sfc(
+      sf::st_point(c(0, 0)),
+      crs = 4326
+    )
+  )
+
+  xml <- paste0(
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<wfs:FeatureCollection ',
+    'xmlns:wfs="http://www.opengis.net/wfs/2.0"/>'
+  )
+
+  response <- list(
+    body = charToRaw(xml)
+  )
+
+  testthat::local_mocked_bindings(
+    request = function(url) {
+      list(url = url)
+    },
+    req_url_query = function(req, ...) {
+      req
+    },
+    req_perform = function(req) {
+      response
+    },
+    resp_check_status = function(response) {
+      invisible(response)
+    },
+    resp_body_raw = function(response) {
+      response$body
+    },
+    .package = "httr2"
+  )
+
+  testthat::local_mocked_bindings(
+    st_read = function(dsn, quiet = TRUE) {
+      sf::st_sf(
+        geometry = sf::st_sfc(
+          crs = 3857
+        )
+      )
+    },
+    .package = "sf"
+  )
+
+  testthat::expect_message(
+    res <- get_wfs(
+      x = x,
+      layer = "BassinDCE",
+      verbose = FALSE
+    ),
+    regexp = "No features found"
+  )
+
+  testthat::expect_null(res)
 })
